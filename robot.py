@@ -51,10 +51,10 @@ class PD:
         
 
     def get_value(self, error):
-        print("error ", error)
+        # print("error ", error)
         # t = time.time()
         
-        print("dt", self.dT)
+        # print("dt", self.dT)
         deriv = (error - self.prev_error)/self.dT
 
         self.prev_error = error
@@ -72,16 +72,16 @@ class PD:
 class RobotSprite(pygame.sprite.Sprite):
     def __init__(self, location):
         pygame.sprite.Sprite.__init__(self)
-
-        self.rect = pygame.Rect(location[0], location[1], 20, 20)
-        self.rect.center = location
-        self.image = pygame.Surface(location)
-        self.image.fill((0, 0, 0))
-
+        self.image = pygame.Surface((60, 60))
+        self.image.fill(pygame.Color(123, 123, 123))
+        self.rect = self.image.get_rect()
+        self.rect.centerx = location[0]
+        self.rect.centery = location[1]
         
 
-    def set_location(self, new_location):
-        self.rect.center = new_location
+    def set_location(self, x, y):
+        self.rect.centerx = x
+        self.rect.centery = y
 
 class Button(pygame.sprite.Sprite):
     def __init__(self, location):
@@ -108,22 +108,30 @@ class Robot:
         self.yGraph = np.array([])
         self.allPositions = []
         self.mode = "driver"
+        self.threads = {"misc": []}
+        self.isFPSing = True
+
+    def add_thread(self, t, name = None):
+        if name != None: self.threads[name] = t
+        else: self.threads["misc"].append(t)
 
     def run(self):
-        fps = threading.Thread(target=self.fps)
+        fps = threading.Thread(target=self.fps, name="fps")
         fps.start()
+        self.add_thread(fps, "fps")
     
     def fps(self):
         prev_left = 0
         prev_right = 0
         prev_phi = 0
         width = 5 # width from wheel to middle
-        while(True):
-            print(self.x, self.y)
+        while(self.isFPSing):
 
             heading = self.devices["IMU"].get()
             deltaL = self.devices["FL"].get() - prev_left
             deltaR = self.devices["FR"].get() - prev_right
+            print(deltaL, deltaR, self.x, self.y)
+            
             middle = (deltaL + deltaR) / 2
             self.x += (middle * math.cos(heading))
             self.y += (middle * math.sin(heading))
@@ -143,32 +151,32 @@ class Robot:
             prev_phi = self.devices["IMU"].get()
             prev_left = self.devices["FL"].get()
             prev_right = self.devices["FR"].get()
-            time.sleep(0.05)
+            time.sleep(0.02)
 
-
+    def get_pos(self):
+        return (self.x, self.y)
 
     def moveTransReal(self, target):
-        pd = PD(0.7, 0.7, 2)
+        pd = PD(0.78, 0.7, 2)
         bound = 0
         startTime = 0
-        # curr = 0
-        while(bound < 5):
+        curr = 0
+        while(bound < 4):
             left = self.devices["FL"].get()
-            self.yGraph = np.append(self.yGraph, left)
+            self.yGraph = np.append(self.yGraph, curr)
             self.xGraph = np.append(self.xGraph, startTime + pd.dT)
             startTime += pd.dT
-            print("hi")
-            speed = pd.get_value(target - left)
+            speed = pd.get_value(target - curr)
             # if abs(target - self.devices["FL"].get()) < 3:
             #     break
-            if speed == pd.minspeed and abs(target - left) < 3:
+            if speed == pd.minspeed and abs(target - curr) < 3:
                 bound+=1
-                
-            self.allPositions.append(left)
-            self.devices["FL"].move_amount(speed)
+            curr += speed
+            self.allPositions.append(curr)
+            self.devices["FL"].move_amount(speed) # annoying to do voltages lol
             self.devices["BL"].move_amount(speed)
-            self.devices["FR"].move_amount(-speed)
-            self.devices["BR"].move_amount(-speed)
+            self.devices["FR"].move_amount(speed)
+            self.devices["BR"].move_amount(speed)
             time.sleep(round(pd.dT/1000, 3))
 
 
@@ -176,7 +184,8 @@ class Robot:
     def moveTrans(self, target):
         t = threading.Thread(target=self.moveTransReal, args=(target,))
         t.start()
-        t.join()
+        self.add_thread(t)
+        # t.join()
 
     def moveRot(self, deg):
         pd = PD(0.7, 0.7, 2)
@@ -187,8 +196,6 @@ class Robot:
             self.xGraph = np.append(self.xGraph, startTime + 0.02)
 
             if abs(deg - self.devices["IMU"].get() < 3): bound += 1
-
-
             speed = pd.get_value(deg - self.devices["IMU"].get()) # imu increases to the right
 
             self.yGraph = np.append(self.yGraph, self.devices["FL"].get())
@@ -220,25 +227,37 @@ class Robot:
 
         background = pygame.Surface((WIDTH, HEIGHT)) # for drawing items
         running = True
-        robot = RobotSprite([0, 0])
+        robot = RobotSprite((0, 0))
+
         # pygame.Rect()
         # turnLeftButton = pygame.Rect(100, 0, 30, 30)
         # turnRightButton = pygame.Rect(100, 100, 30, 30)
         print("plotting field...")
+        x = time.time()
         if self.mode == "driver":
             while running:
+                # print(pygame.mouse.get_pos())
+                # if time.time() - x >= 8:
+                #     self.isFPSing = False
+                #     self.threads["fps"].join()
                 clock.tick(FPS)
+                background.fill((255, 255, 255))
+                screen.fill((255, 255, 255))
+                
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_w:
                             print("w")
-                            self.moveTrans(10)
+                            self.moveTrans(-10)
                         elif event.key == pygame.K_a:
                             print("a")
                         elif event.key == pygame.K_s:
                             print("s")
+                            self.moveTrans(10)
+
                         elif event.key == pygame.K_d:
                             print("d")
+
                     # elif event.type == pygame.MOUSEBUTTONDOWN:
                     #     if event.button == 1:
                     #         if turnLeftButton.collidepoint(event.pos):
@@ -246,8 +265,9 @@ class Robot:
                     #         elif turnRightButton.collidepoint(event.pos):
                     #             print("right clicked")
                         # print(event.key)
-                screen.blit(background, robot)
-                background.fill((255, 255, 255))
+                robot.set_location(self.get_pos()[0], self.get_pos()[1])
+                
+                screen.blit(robot.image, robot.rect)
 
                 # all_sprites.draw(screen)
 
@@ -268,7 +288,7 @@ robot = Robot()
 
 robot.run()
 
-robot.moveTrans(100)
+# robot.moveTrans(100)
 
 # print(robot.x, robot.y)
 
