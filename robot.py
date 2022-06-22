@@ -163,20 +163,22 @@ class Robot:
         curr = 0
         while(bound < 4):
             left = self.devices["FL"].get()
-            self.yGraph = np.append(self.yGraph, curr)
+            print("hihi")
+            self.yGraph = np.append(self.yGraph, left)
             self.xGraph = np.append(self.xGraph, startTime + pd.dT)
             startTime += pd.dT
-            speed = pd.get_value(target - curr)
+            speed = pd.get_value(target - left)
             # if abs(target - self.devices["FL"].get()) < 3:
             #     break
-            if speed == pd.minspeed and abs(target - curr) < 3:
+            if speed == pd.minspeed and abs(target - left) < 3:
                 bound+=1
-            curr += speed
-            self.allPositions.append(curr)
+            # curr += speed
+            self.allPositions.append(left)
             self.devices["FL"].move_amount(speed) # annoying to do voltages lol
             self.devices["BL"].move_amount(speed)
-            self.devices["FR"].move_amount(speed)
+            self.devices["FR"].move_amount(speed) # assume reversed.
             self.devices["BR"].move_amount(speed)
+            # print(self.xGraph, self.yGraph)
             time.sleep(round(pd.dT/1000, 3))
 
 
@@ -185,7 +187,7 @@ class Robot:
         t = threading.Thread(target=self.moveTransReal, args=(target,))
         t.start()
         self.add_thread(t)
-        # t.join()
+        t.join()
 
     def moveRot(self, deg):
         pd = PD(0.7, 0.7, 2)
@@ -198,8 +200,8 @@ class Robot:
             if abs(deg - self.devices["IMU"].get() < 3): bound += 1
             speed = pd.get_value(deg - self.devices["IMU"].get()) # imu increases to the right
 
-            self.yGraph = np.append(self.yGraph, self.devices["FL"].get())
-            self.xGraph = np.append(self.xGraph, startTime + 0.02)
+            # self.yGraph = np.append(self.yGraph, self.devices["FL"].get())
+            # self.xGraph = np.append(self.xGraph, startTime + 0.02)
             startTime += 0.02
             
     def plotPID(self):
@@ -288,10 +290,10 @@ robot = Robot()
 
 robot.run()
 
-# robot.moveTrans(100)
+robot.moveTrans(100)
 
 # print(robot.x, robot.y)
 
-# robot.plotPID()
+robot.plotPID()
 
-robot.plotField()
+# robot.plotField()
