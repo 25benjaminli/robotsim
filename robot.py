@@ -1,3 +1,4 @@
+from logging.handlers import SYSLOG_UDP_PORT
 import matplotlib.pyplot as plt
 import time
 import numpy as np
@@ -56,7 +57,7 @@ class PD:
         
         # print("dt", self.dT)
         deriv = (error - self.prev_error)/self.dT
-
+        print("deriv: " + str(deriv))
         self.prev_error = error
         # self.prev_time = t
 
@@ -161,7 +162,7 @@ class Robot:
         bound = 0
         startTime = 0
         curr = 0
-        while(bound < 4):
+        while(bound < 3):
             left = self.devices["FL"].get()
             print("hihi")
             self.yGraph = np.append(self.yGraph, left)
@@ -284,6 +285,32 @@ class Robot:
     def clearMovements(self):
         self.xGraph = np.array([])
         self.yGraph = np.array([]) 
+
+    
+    def moveTo(self, x2, y2):
+        # left vs. right turn
+        dist = math.pow((self.x-x2),2) + math.pow((self.y-y2),2)
+        s1 = math.pow(self.x, 2) + math.pow(self.y,2)
+        s2 = math.pow((self.x-x2),2) + math.pow((self.y-y2),2)
+        s3 = math.pow(x2, 2) + math.pow(y2, 2)
+
+        theta = 180-math.asin((math.pow(s1, 2)+math.pow(s2, 2)-s3)/(2*s1*s2)) # how much robot needs to turn
+        # left turn & right turn cases
+        lturn = self.devices['IMU'].get() + theta
+        rturn = self.devices['IMU'].get() - theta
+
+        if (math.cos(180-theta)*40 == y2 and math.sin(180-theta)*40 == x2):
+            # left turn is the way
+            self.moveRot(lturn)
+            self.moveTrans(dist)
+
+        else:
+            self.moveRot(rturn)
+            self.moveTrans(dist)
+
+            # right turn is the way
+
+
 
 
 robot = Robot()
